@@ -1,4 +1,4 @@
-# 4-Week Monte Carlo Options Pricer Plan
+# 4-Phase Monte Carlo Options Pricer Plan
 
 ## Summary
 
@@ -23,25 +23,25 @@ Build a focused C++20 command-line Monte Carlo options pricer for quant SWE inte
 
 ## Implementation Plan
 
-- Week 1:
+- Phase 1:
   - Set up CMake project, CLI argument parsing, core pricing structs, payoff logic.
   - Implement Black-Scholes formula for European call/put.
   - Implement single-threaded Monte Carlo for European options.
   - Add unit tests for payoff logic and Black-Scholes reference values.
 
-- Week 2:
+- Phase 2:
   - Add Asian option path simulation with configurable time steps.
   - Add standard error and 95% confidence interval reporting.
   - Add statistical tests showing European Monte Carlo converges near Black-Scholes.
   - Polish validation for required CLI arguments and invalid numeric inputs.
 
-- Week 3:
+- Phase 3:
   - Add antithetic variates.
   - Add multithreaded simulation with deterministic per-thread seeding.
   - Add a reusable simulation accumulator for mean, variance, confidence intervals, and path counts.
   - Add reproducibility tests for fixed seeds.
 
-- Week 4:
+- Phase 4:
   - Add benchmark command for paths/sec and thread scaling.
   - Compare plain Monte Carlo versus antithetic variates in benchmarks.
   - Polish CLI output, README examples, and benchmark table.
@@ -73,4 +73,4 @@ Build a focused C++20 command-line Monte Carlo options pricer for quant SWE inte
 - Barrier, digital, and American options are out of scope to keep the project focused.
 - CSV/JSON exports and parameter sweeps are deferred unless the core project finishes early.
 - The priority is a polished, explainable quant SWE resume project rather than broad product coverage.
-- Each week should leave the project in a runnable state with tests passing.
+- Each phase should leave the project in a runnable state with tests passing.
