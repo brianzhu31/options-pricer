@@ -9,5 +9,9 @@ MonteCarloResult price_european_monte_carlo(
     const MonteCarloConfig& config
 );
 
-}  // namespace options_pricer
+MonteCarloResult price_asian_monte_carlo(
+    const AsianOption& option,
+    const MonteCarloConfig& config
+);
 
+}  // namespace options_pricer

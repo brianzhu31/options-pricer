@@ -10,6 +10,7 @@
 namespace {
 
 using options_pricer::EuropeanOption;
+using options_pricer::AsianOption;
 using options_pricer::MonteCarloConfig;
 using options_pricer::OptionType;
 
@@ -99,13 +100,91 @@ void test_monte_carlo_is_reproducible_for_fixed_seed() {
     );
 }
 
+void test_asian_option_with_one_step_matches_european() {
+    const EuropeanOption european{
+        .type = OptionType::Put,
+        .spot = 100.0,
+        .strike = 105.0,
+        .rate = 0.03,
+        .volatility = 0.25,
+        .maturity = 1.5,
+    };
+    const AsianOption asian{
+        .type = european.type,
+        .spot = european.spot,
+        .strike = european.strike,
+        .rate = european.rate,
+        .volatility = european.volatility,
+        .maturity = european.maturity,
+        .steps = 1,
+    };
+    const MonteCarloConfig config{.paths = 20'000, .seed = 77};
+
+    const auto european_result =
+        options_pricer::price_european_monte_carlo(european, config);
+    const auto asian_result =
+        options_pricer::price_asian_monte_carlo(asian, config);
+
+    require_equal("one-step Asian price", asian_result.price, european_result.price);
+    require_equal(
+        "one-step Asian standard error",
+        asian_result.standard_error,
+        european_result.standard_error
+    );
+}
+
+void test_confidence_interval_and_european_convergence() {
+    const EuropeanOption option{
+        .type = OptionType::Call,
+        .spot = 100.0,
+        .strike = 100.0,
+        .rate = 0.05,
+        .volatility = 0.2,
+        .maturity = 1.0,
+    };
+    const auto result = options_pricer::price_european_monte_carlo(
+        option,
+        MonteCarloConfig{.paths = 500'000, .seed = 42}
+    );
+    const double exact = options_pricer::black_scholes_price(option);
+
+    if (result.standard_error <= 0.0 ||
+        result.confidence_interval_low >= result.confidence_interval_high) {
+        std::cerr << "Monte Carlo uncertainty statistics are invalid\n";
+        std::exit(EXIT_FAILURE);
+    }
+    if (exact < result.confidence_interval_low ||
+        exact > result.confidence_interval_high) {
+        std::cerr << "Black-Scholes price is outside Monte Carlo 95% confidence interval\n";
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+void test_more_paths_reduce_standard_error() {
+    const EuropeanOption option{};
+    const auto small = options_pricer::price_european_monte_carlo(
+        option,
+        MonteCarloConfig{.paths = 10'000, .seed = 123}
+    );
+    const auto large = options_pricer::price_european_monte_carlo(
+        option,
+        MonteCarloConfig{.paths = 100'000, .seed = 123}
+    );
+    if (large.standard_error >= small.standard_error) {
+        std::cerr << "standard error did not decrease with more paths\n";
+        std::exit(EXIT_FAILURE);
+    }
+}
+
 }  // namespace
 
 int main() {
     test_european_payoffs();
     test_black_scholes_reference_values();
     test_monte_carlo_is_reproducible_for_fixed_seed();
+    test_asian_option_with_one_step_matches_european();
+    test_confidence_interval_and_european_convergence();
+    test_more_paths_reduce_standard_error();
     std::cout << "All tests passed\n";
     return EXIT_SUCCESS;
 }
-
