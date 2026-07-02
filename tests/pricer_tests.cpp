@@ -1,6 +1,7 @@
 #include "options_pricer/black_scholes.hpp"
 #include "options_pricer/monte_carlo.hpp"
 #include "options_pricer/payoff.hpp"
+#include "options_pricer/statistics.hpp"
 
 #include <cmath>
 #include <cstdlib>
@@ -176,6 +177,77 @@ void test_more_paths_reduce_standard_error() {
     }
 }
 
+void test_running_statistics_and_merge() {
+    options_pricer::RunningStatistics first;
+    first.add(1.0);
+    first.add(2.0);
+    options_pricer::RunningStatistics second;
+    second.add(3.0);
+    second.add(4.0);
+    first.merge(second);
+
+    require_equal("running statistics count", static_cast<double>(first.count()), 4.0);
+    require_close("running statistics mean", first.mean(), 2.5, 1e-12);
+    require_close(
+        "running statistics sample variance",
+        first.sample_variance(),
+        5.0 / 3.0,
+        1e-12
+    );
+}
+
+void test_multithreaded_run_is_reproducible() {
+    const EuropeanOption option{};
+    const MonteCarloConfig config{
+        .paths = 100'000,
+        .seed = 9876,
+        .threads = 4,
+        .antithetic = true,
+    };
+    const auto first = options_pricer::price_european_monte_carlo(option, config);
+    const auto second = options_pricer::price_european_monte_carlo(option, config);
+
+    require_equal("multithreaded fixed-seed price", first.price, second.price);
+    require_equal(
+        "multithreaded fixed-seed standard error",
+        first.standard_error,
+        second.standard_error
+    );
+}
+
+void test_antithetic_variates_reduce_standard_error() {
+    const EuropeanOption option{
+        .type = OptionType::Call,
+        .spot = 100.0,
+        .strike = 100.0,
+        .rate = 0.05,
+        .volatility = 0.2,
+        .maturity = 1.0,
+    };
+    const auto plain = options_pricer::price_european_monte_carlo(
+        option,
+        MonteCarloConfig{
+            .paths = 200'000,
+            .seed = 314159,
+            .threads = 1,
+            .antithetic = false,
+        }
+    );
+    const auto antithetic = options_pricer::price_european_monte_carlo(
+        option,
+        MonteCarloConfig{
+            .paths = 200'000,
+            .seed = 314159,
+            .threads = 1,
+            .antithetic = true,
+        }
+    );
+    if (antithetic.standard_error >= plain.standard_error) {
+        std::cerr << "antithetic variates did not reduce standard error\n";
+        std::exit(EXIT_FAILURE);
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -185,6 +257,9 @@ int main() {
     test_asian_option_with_one_step_matches_european();
     test_confidence_interval_and_european_convergence();
     test_more_paths_reduce_standard_error();
+    test_running_statistics_and_merge();
+    test_multithreaded_run_is_reproducible();
+    test_antithetic_variates_reduce_standard_error();
     std::cout << "All tests passed\n";
     return EXIT_SUCCESS;
 }

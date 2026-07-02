@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iostream>
 #include <optional>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -32,7 +33,7 @@ void print_usage(std::ostream& out) {
         << "Usage:\n"
         << "  options-pricer price --kind european|asian --type call|put "
         << "--spot N --strike N --rate N --vol N --maturity N --paths N "
-        << "[--steps N] [--seed N]\n"
+        << "[--steps N] [--seed N] [--threads N] [--antithetic]\n"
         << "  --steps is required for Asian options and invalid for European options.\n\n"
         << "Example:\n"
         << "  options-pricer price --kind european --type call --spot 100 --strike 100 "
@@ -139,6 +140,14 @@ PriceCommand parse_price_command(const std::vector<std::string>& args) {
             saw_steps = true;
         } else if (auto value = value_after(args, i, "--seed")) {
             command.monte_carlo.seed = parse_uint64("--seed", *value);
+        } else if (auto value = value_after(args, i, "--threads")) {
+            const std::uint64_t threads = parse_uint64("--threads", *value);
+            if (threads > std::numeric_limits<std::uint32_t>::max()) {
+                throw std::invalid_argument("--threads is too large");
+            }
+            command.monte_carlo.threads = static_cast<std::uint32_t>(threads);
+        } else if (args[i] == "--antithetic") {
+            command.monte_carlo.antithetic = true;
         } else {
             throw std::invalid_argument("unknown argument: " + args[i]);
         }
@@ -167,6 +176,9 @@ PriceCommand parse_price_command(const std::vector<std::string>& args) {
     }
     if (command.kind == OptionKind::European && saw_steps) {
         throw std::invalid_argument("--steps is only valid for Asian options");
+    }
+    if (command.monte_carlo.antithetic && command.monte_carlo.paths % 2 != 0) {
+        throw std::invalid_argument("--paths must be even with --antithetic");
     }
 
     return command;
@@ -221,6 +233,9 @@ int run(const std::vector<std::string>& args) {
               << monte_carlo.confidence_interval_high << "]\n";
     std::cout << "paths: " << monte_carlo.paths << '\n';
     std::cout << "seed: " << command.monte_carlo.seed << '\n';
+    std::cout << "threads: " << command.monte_carlo.threads << '\n';
+    std::cout << "antithetic: "
+              << (command.monte_carlo.antithetic ? "true" : "false") << '\n';
 
     return 0;
 }

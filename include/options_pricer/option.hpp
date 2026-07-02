@@ -36,6 +36,8 @@ struct AsianOption {
 struct MonteCarloConfig {
     std::uint64_t paths{100'000};
     std::uint64_t seed{42};
+    std::uint32_t threads{1};
+    bool antithetic{false};
 };
 
 struct MonteCarloResult {
