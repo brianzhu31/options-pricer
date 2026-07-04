@@ -4,6 +4,11 @@
 
 Build a focused C++20 command-line Monte Carlo options pricer for quant SWE intern recruiting. Keep the scope tight: one executable, strong correctness checks, clean performance story, and resume-ready benchmarks.
 
+## Status
+
+All four phases are implemented. Build instructions, CLI examples, measured
+benchmark results, and project-summary bullets are in `README.md`.
+
 ## Key Changes
 
 - Build a CLI-only C++20 project with CMake.

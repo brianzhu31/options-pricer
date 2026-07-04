@@ -60,6 +60,21 @@ void test_european_payoffs() {
     );
 }
 
+void test_asian_average_payoffs() {
+    const double call_average = (90.0 + 110.0 + 130.0) / 3.0;
+    require_equal(
+        "Asian average call payoff",
+        options_pricer::european_payoff(OptionType::Call, call_average, 100.0),
+        10.0
+    );
+    const double put_average = (70.0 + 80.0 + 90.0) / 3.0;
+    require_equal(
+        "Asian average put payoff",
+        options_pricer::european_payoff(OptionType::Put, put_average, 100.0),
+        20.0
+    );
+}
+
 void test_black_scholes_reference_values() {
     const EuropeanOption call{
         .type = OptionType::Call,
@@ -252,6 +267,7 @@ void test_antithetic_variates_reduce_standard_error() {
 
 int main() {
     test_european_payoffs();
+    test_asian_average_payoffs();
     test_black_scholes_reference_values();
     test_monte_carlo_is_reproducible_for_fixed_seed();
     test_asian_option_with_one_step_matches_european();

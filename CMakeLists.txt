@@ -38,3 +38,10 @@ add_executable(options_pricer_tests tests/pricer_tests.cpp)
 target_link_libraries(options_pricer_tests PRIVATE options_pricer_core)
 
 add_test(NAME options_pricer_tests COMMAND options_pricer_tests)
+
+add_test(
+    NAME options_pricer_cli_tests
+    COMMAND ${CMAKE_COMMAND}
+        -DOPTIONS_PRICER=$<TARGET_FILE:options-pricer>
+        -P ${PROJECT_SOURCE_DIR}/tests/cli_tests.cmake
+)

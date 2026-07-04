@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <exception>
 #include <cmath>
+#include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <limits>
@@ -28,16 +30,24 @@ struct PriceCommand {
     std::uint64_t steps{0};
 };
 
+struct BenchmarkCommand {
+    std::vector<std::uint64_t> path_counts{100'000, 1'000'000};
+    std::vector<std::uint32_t> thread_counts{1, 2, 4, 8};
+    std::uint64_t seed{42};
+};
+
 void print_usage(std::ostream& out) {
     out
         << "Usage:\n"
         << "  options-pricer price --kind european|asian --type call|put "
         << "--spot N --strike N --rate N --vol N --maturity N --paths N "
         << "[--steps N] [--seed N] [--threads N] [--antithetic]\n"
+        << "  options-pricer bench [--paths N,N,...] [--threads N,N,...] [--seed N]\n"
         << "  --steps is required for Asian options and invalid for European options.\n\n"
-        << "Example:\n"
+        << "Examples:\n"
         << "  options-pricer price --kind european --type call --spot 100 --strike 100 "
-        << "--rate 0.05 --vol 0.2 --maturity 1 --paths 100000\n";
+        << "--rate 0.05 --vol 0.2 --maturity 1 --paths 100000\n"
+        << "  options-pricer bench --paths 100000,1000000 --threads 1,2,4,8\n";
 }
 
 double parse_double(std::string_view name, const std::string& value) {
@@ -65,6 +75,29 @@ std::uint64_t parse_uint64(std::string_view name, const std::string& value) {
         throw std::invalid_argument(std::string(name) + " must be positive");
     }
     return static_cast<std::uint64_t>(result);
+}
+
+std::vector<std::uint64_t> parse_uint64_list(
+    std::string_view name,
+    const std::string& value
+) {
+    std::vector<std::uint64_t> values;
+    std::size_t begin = 0;
+    while (begin <= value.size()) {
+        const std::size_t comma = value.find(',', begin);
+        const std::string item = value.substr(begin, comma - begin);
+        if (item.empty()) {
+            throw std::invalid_argument(
+                std::string(name) + " must be a comma-separated integer list"
+            );
+        }
+        values.push_back(parse_uint64(name, item));
+        if (comma == std::string::npos) {
+            break;
+        }
+        begin = comma + 1;
+    }
+    return values;
 }
 
 std::optional<std::string> value_after(
@@ -184,12 +217,101 @@ PriceCommand parse_price_command(const std::vector<std::string>& args) {
     return command;
 }
 
+BenchmarkCommand parse_benchmark_command(const std::vector<std::string>& args) {
+    BenchmarkCommand command;
+    for (std::size_t i = 2; i < args.size(); ++i) {
+        if (auto value = value_after(args, i, "--paths")) {
+            command.path_counts = parse_uint64_list("--paths", *value);
+        } else if (auto value = value_after(args, i, "--threads")) {
+            const auto values = parse_uint64_list("--threads", *value);
+            command.thread_counts.clear();
+            for (const std::uint64_t threads : values) {
+                if (threads > std::numeric_limits<std::uint32_t>::max()) {
+                    throw std::invalid_argument("--threads value is too large");
+                }
+                command.thread_counts.push_back(static_cast<std::uint32_t>(threads));
+            }
+        } else if (auto value = value_after(args, i, "--seed")) {
+            command.seed = parse_uint64("--seed", *value);
+        } else {
+            throw std::invalid_argument("unknown benchmark argument: " + args[i]);
+        }
+    }
+
+    for (const std::uint64_t paths : command.path_counts) {
+        if (paths % 2 != 0) {
+            throw std::invalid_argument(
+                "benchmark path counts must be even for antithetic comparison"
+            );
+        }
+    }
+    return command;
+}
+
+void run_benchmark(const BenchmarkCommand& command) {
+    const EuropeanOption option{};
+
+    std::cout
+        << "Benchmark: European ATM call (spot=100, strike=100, rate=0.05, "
+        << "vol=0.2, maturity=1)\n";
+    std::cout
+        << std::left
+        << std::setw(12) << "mode"
+        << std::right
+        << std::setw(12) << "paths"
+        << std::setw(10) << "threads"
+        << std::setw(14) << "price"
+        << std::setw(16) << "std_error"
+        << std::setw(14) << "elapsed_ms"
+        << std::setw(18) << "paths_per_sec"
+        << '\n';
+
+    for (const std::uint64_t paths : command.path_counts) {
+        for (const std::uint32_t threads : command.thread_counts) {
+            for (const bool antithetic : {false, true}) {
+                const MonteCarloConfig config{
+                    .paths = paths,
+                    .seed = command.seed,
+                    .threads = threads,
+                    .antithetic = antithetic,
+                };
+                const auto start = std::chrono::steady_clock::now();
+                const auto result =
+                    options_pricer::price_european_monte_carlo(option, config);
+                const auto stop = std::chrono::steady_clock::now();
+                const double elapsed_seconds =
+                    std::chrono::duration<double>(stop - start).count();
+                const double elapsed_ms = elapsed_seconds * 1'000.0;
+                const double paths_per_second =
+                    static_cast<double>(paths) / elapsed_seconds;
+
+                std::cout
+                    << std::left << std::setw(12)
+                    << (antithetic ? "antithetic" : "plain")
+                    << std::right
+                    << std::setw(12) << paths
+                    << std::setw(10) << threads
+                    << std::setw(14) << std::fixed << std::setprecision(6)
+                    << result.price
+                    << std::setw(16) << result.standard_error
+                    << std::setw(14) << std::setprecision(3) << elapsed_ms
+                    << std::setw(18) << std::setprecision(0) << paths_per_second
+                    << '\n';
+            }
+        }
+    }
+}
+
 int run(const std::vector<std::string>& args) {
     if (args.size() == 1 || args[1] == "--help" || args[1] == "-h") {
         print_usage(std::cout);
         return 0;
     }
 
+    if (args[1] == "bench") {
+        run_benchmark(parse_benchmark_command(args));
+        return 0;
+    }
     if (args[1] != "price") {
         throw std::invalid_argument("unknown command: " + args[1]);
     }
