@@ -2,7 +2,7 @@
 
 ## Summary
 
-Build a focused C++20 command-line Monte Carlo options pricer for quant SWE intern recruiting. Keep the scope tight: one executable, strong correctness checks, clean performance story, and resume-ready benchmarks.
+Build a focused C++20 command-line Monte Carlo options pricer. Keep the scope tight: one executable, strong correctness checks, clean performance story, and reproducible benchmarks.
 
 ## Status
 
@@ -50,7 +50,7 @@ benchmark results, and project-summary bullets are in `README.md`.
   - Add benchmark command for paths/sec and thread scaling.
   - Compare plain Monte Carlo versus antithetic variates in benchmarks.
   - Polish CLI output, README examples, and benchmark table.
-  - Add final resume bullets explaining numerical methods, validation, and performance results.
+  - Add final project highlights explaining numerical methods, validation, and performance results.
 
 ## Test Plan
 
@@ -77,5 +77,5 @@ benchmark results, and project-summary bullets are in `README.md`.
 - No reusable public API is required; CLI is the main product.
 - Barrier, digital, and American options are out of scope to keep the project focused.
 - CSV/JSON exports and parameter sweeps are deferred unless the core project finishes early.
-- The priority is a polished, explainable quant SWE resume project rather than broad product coverage.
+- The priority is a polished, explainable options pricer rather than broad product coverage.
 - Each phase should leave the project in a runnable state with tests passing.
